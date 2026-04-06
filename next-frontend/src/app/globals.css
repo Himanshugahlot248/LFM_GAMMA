@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --ui-primary: #f6c445;
+  --ui-secondary: #1b6ef3;
+  --ui-bg: #f8fbff;
+  --ui-text: #0f172a;
+  --ui-font-heading: var(--font-display), ui-serif, Georgia, serif;
+  --ui-font-body: var(--font-geist-sans), Arial, sans-serif;
+  --ui-spacing: 1rem;
+  --ui-radius: 1rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-playfair), ui-serif, Georgia, "Times New Roman", serif;
+}
+
+body {
+  background: radial-gradient(1000px circle at 15% 10%, color-mix(in oklab, var(--ui-secondary) 28%, transparent), transparent 55%),
+    radial-gradient(900px circle at 85% 30%, color-mix(in oklab, var(--ui-primary) 20%, transparent), transparent 60%),
+    radial-gradient(700px circle at 50% 90%, color-mix(in oklab, var(--ui-secondary) 20%, transparent), transparent 55%),
+    var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--ui-font-body);
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+
+body::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: 0.22;
+  z-index: 0;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(800px circle at 30% 20%, rgba(27,110,243,0.18), transparent 55%);
+  z-index: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button:not(:disabled) {
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease,
+    filter 150ms ease;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(1.03);
+}
+
+button:not(:disabled):active {
+  filter: brightness(0.98);
+}
+
+/* Gamma-style deck titles (Playfair via --font-playfair from layout) */
+.font-display {
+  font-family: var(--ui-font-heading);
+}
+

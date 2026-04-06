@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scrape Test — agent-core</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+        background: #0f1117;
+        color: #e2e8f0;
+        min-height: 100vh;
+        padding: 32px 16px 64px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: #f8fafc;
+      }
+
+      .subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 32px;
+      }
+
+      .subtitle a { color: #3b82f6; text-decoration: none; }
+      .subtitle a:hover { text-decoration: underline; }
+
+      /* ── upload card ── */
+      .upload-card {
+        background: #1e2130;
+        border: 1px solid #2d3148;
+        border-radius: 14px;
+        padding: 28px 24px;
+        max-width: 640px;
+        margin: 0 auto 40px;
+      }
+
+      .drop-zone {
+        border: 2px dashed #374151;
+        border-radius: 10px;
+        padding: 36px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        margin-bottom: 20px;
+        position: relative;
+      }
+
+      .drop-zone.drag-over {
+        border-color: #3b82f6;
+        background: rgba(59,130,246,0.06);
+      }
+
+      .drop-zone input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+
+      .drop-icon {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        display: block;
+      }
+
+      .drop-zone p { font-size: 0.9rem; color: #94a3b8; }
+      .drop-zone .filename { font-size: 0.85rem; color: #60a5fa; margin-top: 8px; font-weight: 600; }
+
+      .btn-primary {
+        width: 100%;
+        padding: 12px 0;
+        background: #2563eb;
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+      .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+      /* ── status bar ── */
+      #statusBar {
+        max-width: 640px;
+        margin: 0 auto 24px;
+        font-size: 0.85rem;
+        color: #94a3b8;
+        min-height: 20px;
+        text-align: center;
+      }
+
+      #statusBar .err { color: #f87171; }
+      #statusBar .ok  { color: #34d399; }
+
+      /* ── progress ── */
+      .progress-wrap {
+        max-width: 640px;
+        margin: 0 auto 28px;
+        display: none;
+      }
+
+      .progress-wrap.visible { display: block; }
+
+      .progress-bar-bg {
+        background: #1e2130;
+        border: 1px solid #2d3148;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+      }
+
+      .progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #3b82f6, #06b6d4);
+        border-radius: 999px;
+        transition: width 0.3s ease;
+      }
+
+      .progress-label {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-top: 6px;
+        text-align: right;
+      }
+
+      /* ── summary bar ── */
+      .summary {
+        max-width: 900px;
+        margin: 0 auto 24px;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .stat-pill {
+        background: #1e2130;
+        border: 1px solid #2d3148;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-size: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .stat-pill .label { color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+      .stat-pill .value { font-size: 1.15rem; font-weight: 700; color: #f8fafc; }
+      .stat-pill.green .value { color: #34d399; }
+      .stat-pill.red   .value { color: #f87171; }
+
+      /* ── results grid ── */
+      .results-header {
+        max-width: 900px;
+        margin: 0 auto 16px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #94a3b8;
+        display: none;
+      }
+
+      #resultsGrid {
+        max-width: 900px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+      }
+
+      .result-card {
+        background: #1e2130;
+        border: 1px solid #2d3148;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: border-color 0.2s;
+      }
+
+      .result-card:hover { border-color: #3b4168; }
+      .result-card.has-error { border-color: #7f1d1d; }
+
+      .thumb-wrap {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #141621;
+        overflow: hidden;
+        position: relative;
+        flex-shrink: 0;
+      }
+
+      .thumb-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .thumb-wrap .no-thumb {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #374151;
+        font-size: 2rem;
+      }
+
+      .platform-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: rgba(0,0,0,0.65);
+        color: #e2e8f0;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        backdrop-filter: blur(4px);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .card-body {
+        padding: 12px 14px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+
+      .row-index {
+        font-size: 0.7rem;
+        color: #475569;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .uploader {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #60a5fa;
+      }
+
+      .caption {
+        font-size: 0.82rem;
+        color: #94a3b8;
+        line-height: 1.5;
+        max-height: 72px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+      }
+
+      .thumb-url {
+        font-size: 0.72rem;
+        color: #475569;
+        word-break: break-all;
+      }
+
+      .thumb-url a { color: #3b82f6; text-decoration: none; }
+      .thumb-url a:hover { text-decoration: underline; }
+
+      .error-msg {
+        font-size: 0.78rem;
+        color: #f87171;
+        background: rgba(127,29,29,0.18);
+        border-radius: 6px;
+        padding: 6px 10px;
+      }
+
+      /* ── raw JSON toggle ── */
+      .raw-section {
+        max-width: 900px;
+        margin: 32px auto 0;
+      }
+
+      .raw-toggle {
+        background: none;
+        border: 1px solid #2d3148;
+        color: #64748b;
+        font-size: 0.8rem;
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-bottom: 10px;
+      }
+
+      .raw-toggle:hover { border-color: #3b4168; color: #94a3b8; }
+
+      pre#rawJson {
+        background: #090c14;
+        color: #7dd3fc;
+        padding: 16px;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        overflow: auto;
+        max-height: 400px;
+        display: none;
+        border: 1px solid #1e2a3a;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h1>Scrape Test</h1>
+    <p class="subtitle">
+      Upload a CSV with post URLs → thumbnail &amp; caption extracted via yt-dlp, no AI involved.
+      &nbsp;|&nbsp; <a href="/ui/">Back to chat UI</a>
+    </p>
+
+    <!-- Upload card -->
+    <div class="upload-card">
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="csvFile" accept=".csv" />
+        <span class="drop-icon">📂</span>
+        <p>Drag &amp; drop a CSV file here, or click to browse</p>
+        <p>Expected column: <code>post_url</code> (or any column with "url" / "link" in the name)</p>
+        <div class="filename" id="fileLabel"></div>
+      </div>
+
+      <button class="btn-primary" id="scrapeBtn" disabled>Upload &amp; Scrape</button>
+    </div>
+
+    <!-- Status / error -->
+    <div id="statusBar"></div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label" id="progressLabel"></div>
+    </div>
+
+    <!-- Summary pills -->
+    <div class="summary" id="summary" style="display:none;">
+      <div class="stat-pill">
+        <span class="label">Total rows</span>
+        <span class="value" id="statTotal">0</span>
+      </div>
+      <div class="stat-pill green">
+        <span class="label">Scraped OK</span>
+        <span class="value" id="statOk">0</span>
+      </div>
+      <div class="stat-pill red">
+        <span class="label">Errors</span>
+        <span class="value" id="statErr">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="label">Output file</span>
+        <span class="value" id="statFile" style="font-size:0.75rem; word-break:break-all;"></span>
+      </div>
+    </div>
+
+    <!-- Results header -->
+    <div class="results-header" id="resultsHeader">Results</div>
+
+    <!-- Results grid -->
+    <div id="resultsGrid"></div>
+
+    <!-- Raw JSON -->
+    <div class="raw-section" id="rawSection" style="display:none;">
+      <button class="raw-toggle" id="rawToggle">Show raw JSON</button>
+      <pre id="rawJson"></pre>
+    </div>
+
+    <script>
+      const csvFileInput = document.getElementById('csvFile');
+      const dropZone     = document.getElementById('dropZone');
+      const fileLabel    = document.getElementById('fileLabel');
+      const scrapeBtn    = document.getElementById('scrapeBtn');
+      const statusBar    = document.getElementById('statusBar');
+      const progressWrap = document.getElementById('progressWrap');
+      const progressFill = document.getElementById('progressFill');
+      const progressLabel= document.getElementById('progressLabel');
+      const summary      = document.getElementById('summary');
+      const resultsHeader= document.getElementById('resultsHeader');
+      const resultsGrid  = document.getElementById('resultsGrid');
+      const rawSection   = document.getElementById('rawSection');
+      const rawToggle    = document.getElementById('rawToggle');
+      const rawJsonEl    = document.getElementById('rawJson');
+
+      // ── file selection ──────────────────────────────────────────────
+      csvFileInput.addEventListener('change', () => {
+        const f = csvFileInput.files[0];
+        if (f) {
+          fileLabel.textContent = f.name;
+          scrapeBtn.disabled = false;
+        }
+      });
+
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const f = e.dataTransfer.files[0];
+        if (f && f.name.endsWith('.csv')) {
+          // Patch the input so the rest of the code can read it uniformly
+          const dt = new DataTransfer();
+          dt.items.add(f);
+          csvFileInput.files = dt.files;
+          fileLabel.textContent = f.name;
+          scrapeBtn.disabled = false;
+        } else {
+          setStatus('Please drop a .csv file.', 'err');
+        }
+      });
+
+      // ── raw JSON toggle ─────────────────────────────────────────────
+      rawToggle.addEventListener('click', () => {
+        const visible = rawJsonEl.style.display === 'block';
+        rawJsonEl.style.display = visible ? 'none' : 'block';
+        rawToggle.textContent   = visible ? 'Show raw JSON' : 'Hide raw JSON';
+      });
+
+      // ── helpers ─────────────────────────────────────────────────────
+      function setStatus(msg, cls) {
+        statusBar.innerHTML = `<span class="${cls || ''}">${escHtml(msg)}</span>`;
+      }
+
+      function setProgress(pct, label) {
+        progressWrap.classList.add('visible');
+        progressFill.style.width = pct + '%';
+        progressLabel.textContent = label || '';
+      }
+
+      function hideProgress() {
+        progressWrap.classList.remove('visible');
+        progressFill.style.width = '0%';
+      }
+
+      function escHtml(s) {
+        return String(s)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;');
+      }
+
+      async function jsonFetch(url, options) {
+        const res  = await fetch(url, options);
+        const text = await res.text();
+        let body;
+        try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(body)}`);
+        return body;
+      }
+
+      // ── render results ───────────────────────────────────────────────
+      function renderResults(data) {
+        const rows  = data.rows || [];
+        const total = rows.length;
+        const ok    = rows.filter(r => !r.error).length;
+        const errs  = total - ok;
+
+        // summary pills
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statOk').textContent    = ok;
+        document.getElementById('statErr').textContent   = errs;
+        document.getElementById('statFile').textContent  = data.output_path
+          ? data.output_path.split(/[\\/]/).pop()
+          : '—';
+        summary.style.display = 'flex';
+
+        // results header
+        resultsHeader.style.display = 'block';
+
+        // clear grid
+        resultsGrid.innerHTML = '';
+
+        rows.forEach((row, i) => {
+          const hasError = !!row.error;
+          const card = document.createElement('div');
+          card.className = 'result-card' + (hasError ? ' has-error' : '');
+
+          // thumbnail
+          const thumbWrap = document.createElement('div');
+          thumbWrap.className = 'thumb-wrap';
+
+          if (row.thumbnail_url && !hasError) {
+            const img = document.createElement('img');
+            img.src = row.thumbnail_url;
+            img.alt = 'thumbnail';
+            img.loading = 'lazy';
+            img.onerror = () => { img.style.display = 'none'; thumbWrap.querySelector('.no-thumb') && (thumbWrap.querySelector('.no-thumb').style.display = 'flex'); };
+            thumbWrap.appendChild(img);
+          }
+
+          const noThumb = document.createElement('div');
+          noThumb.className = 'no-thumb';
+          noThumb.textContent = hasError ? '⚠️' : '🖼';
+          noThumb.style.display = (row.thumbnail_url && !hasError) ? 'none' : 'flex';
+          thumbWrap.appendChild(noThumb);
+
+          if (row.platform) {
+            const badge = document.createElement('div');
+            badge.className = 'platform-badge';
+            badge.textContent = row.platform;
+            thumbWrap.appendChild(badge);
+          }
+
+          card.appendChild(thumbWrap);
+
+          // body
+          const body = document.createElement('div');
+          body.className = 'card-body';
+
+          const rowIdx = document.createElement('div');
+          rowIdx.className = 'row-index';
+          rowIdx.textContent = `Row ${i + 1}`;
+          body.appendChild(rowIdx);
+
+          if (row.uploader) {
+            const up = document.createElement('div');
+            up.className = 'uploader';
+            up.textContent = row.uploader;
+            body.appendChild(up);
+          }
+
+          if (row.caption) {
+            const cap = document.createElement('div');
+            cap.className = 'caption';
+            cap.title = row.caption;
+            cap.textContent = row.caption;
+            body.appendChild(cap);
+          }
+
+          if (row.thumbnail_url && !hasError) {
+            const urlDiv = document.createElement('div');
+            urlDiv.className = 'thumb-url';
+            urlDiv.innerHTML = `Thumbnail: <a href="${escHtml(row.thumbnail_url)}" target="_blank" rel="noopener">open ↗</a>`;
+            body.appendChild(urlDiv);
+          }
+
+          if (hasError) {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'error-msg';
+            errDiv.textContent = row.error;
+            body.appendChild(errDiv);
+          }
+
+          card.appendChild(body);
+          resultsGrid.appendChild(card);
+        });
+      }
+
+      // ── main scrape flow ─────────────────────────────────────────────
+      scrapeBtn.addEventListener('click', async () => {
+        const f = csvFileInput.files[0];
+        if (!f) { setStatus('Select a CSV file first.', 'err'); return; }
+
+        // reset UI
+        scrapeBtn.disabled   = true;
+        summary.style.display= 'none';
+        resultsGrid.innerHTML= '';
+        resultsHeader.style.display = 'none';
+        rawSection.style.display    = 'none';
+        rawJsonEl.style.display     = 'none';
+        rawToggle.textContent       = 'Show raw JSON';
+
+        try {
+          // Step 1: upload
+          setStatus('Uploading CSV…');
+          setProgress(15, 'Uploading…');
+
+          const fd = new FormData();
+          fd.append('file', f);
+          const upload = await jsonFetch('/v1/upload_csv', { method: 'POST', body: fd });
+          const csvPath = upload.server_csv_path;
+
+          // Step 2: scrape (yt-dlp, no LLM)
+          setStatus('Scraping via yt-dlp — this may take a moment per URL…');
+          setProgress(40, 'Extracting media metadata…');
+
+          const scraped = await jsonFetch('/v1/scrape_csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv_path: csvPath }),
+          });
+
+          setProgress(100, 'Done');
+          setTimeout(hideProgress, 800);
+
+          // Step 3: render
+          renderResults(scraped);
+
+          const total = (scraped.rows || []).length;
+          const errs  = (scraped.rows || []).filter(r => r.error).length;
+          setStatus(
+            `Done — ${total} row(s) scraped, ${errs} error(s). Output: ${scraped.output_path || '?'}`,
+            errs === 0 ? 'ok' : ''
+          );
+
+          // raw JSON
+          rawJsonEl.textContent     = JSON.stringify(scraped, null, 2);
+          rawSection.style.display  = 'block';
+
+        } catch (err) {
+          hideProgress();
+          setStatus('Error: ' + err.message, 'err');
+        } finally {
+          scrapeBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

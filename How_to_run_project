@@ -1,0 +1,20 @@
+Default: Python backend only (no TypeScript)
+
+1) API (agent-core on port 8000)
+   cd c:\AI_Agent\agent-core
+   python run_api.py
+   # Forces Python-only mode unless you set USE_TS_BRIDGE=1 (stale "bridge" in the shell is ignored).
+   # Optional: .\run_api.ps1   (native; use -Mode bridge only if TS backend on 4000 is running)
+
+2) Frontend
+   cd c:\AI_Agent\next-frontend
+   Ensure .env.local has:
+   NEXT_PUBLIC_API_BASE_URL="http://localhost:8000/api/v1"
+   BACKEND_URL=http://127.0.0.1:8000
+   npm run dev
+
+Optional checks
+   python c:\AI_Agent\agent-core\scripts\native_parity_check.py
+
+Legacy: TypeScript bridge (migration only)
+   Set PPT_EXECUTION_MODE=bridge and run the TS backend (cd backend && npm run dev) on port 4000.

@@ -1,0 +1,28 @@
+node_modules/
+.next/
+out/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+*.egg-info/
+.env
+.env.*
+
+# Build outputs
+backend/dist/
+
+# Generated / runtime artifacts (keep repo small)
+backend/exports/
+backend/generated/
+
+# PowerPoint + temp images generated during runs
+**/*.pptx
+**/*.pdf
+**/exports/
+
+# Never add nested git repositories
+**/.git/
+**/.github/
+

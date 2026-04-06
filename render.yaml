@@ -1,0 +1,21 @@
+# Render Blueprint — LF AI backend (Dockerfile in agent-core/)
+# Includes LibreOffice (PDF) + Playwright Chromium (social/post-tagging agents).
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: lf-ai-backend
+    runtime: docker
+    region: oregon
+    plan: starter
+    dockerfilePath: ./agent-core/Dockerfile
+    dockerContext: ./agent-core
+    healthCheckPath: /health
+    envVars:
+      - key: PPT_EXECUTION_MODE
+        value: native
+      # Set in the dashboard (do not commit secrets):
+      # - OPENAI_API_KEY
+      # - CORS_ORIGINS (e.g. https://your-app.vercel.app,http://localhost:3000)
+      # - PPT_NATIVE_DB_PATH (e.g. /tmp/lf_ai_native.db)
+      # - AUTH_JWT_SECRET

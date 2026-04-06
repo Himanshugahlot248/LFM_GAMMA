@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agent-core Test UI</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; max-width: 980px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+      textarea { width: 100%; min-height: 90px; padding: 10px; font-size: 14px; }
+      input { padding: 8px; font-size: 14px; }
+      button { padding: 10px 14px; cursor: pointer; }
+      pre { background: #0b1020; color: #e6edf3; padding: 12px; overflow: auto; }
+      .muted { color: #6b7280; font-size: 12px; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-top: 12px; }
+      .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 240px; }
+      .status { font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h2>agent-core Test UI</h2>
+
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <span class="muted">Session ID (optional)</span>
+          <input id="sessionId" placeholder="e.g. 71c1a8bd-..." />
+        </div>
+        <div class="field" style="flex: 1.2;">
+          <span class="muted">Quick prompt (optional)</span>
+          <input id="preset" placeholder="e.g. Tag movie titles from this CSV..." />
+        </div>
+      </div>
+
+      <div style="margin-top: 10px;" class="field">
+        <span class="muted">Message</span>
+        <textarea id="message" placeholder="Type your request. Example: Tag movie titles from a CSV."></textarea>
+      </div>
+
+      <div style="margin-top: 12px;" class="field">
+        <span class="muted">Attach CSV (optional)</span>
+        <input id="csvFile" type="file" accept=".csv" />
+        <div class="muted" id="csvPathPreview" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="row" style="margin-top: 12px;">
+        <button id="healthBtn">Check health</button>
+        <button id="sendBtn" style="background: #2563eb; color: white; border: none;">Send to /v1/chat</button>
+        <span class="muted" id="hint"></span>
+      </div>
+
+      <div style="margin-top: 12px;" class="muted">
+        Tip: For the post-tagging agent, your first turn should start a session and the agent will ask for <code>csv_path</code>.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field" style="min-width: 320px;">
+          <span class="muted">Response</span>
+          <div class="status" id="statusText">—</div>
+        </div>
+      </div>
+      <pre id="output">{}</pre>
+    </div>
+
+    <script>
+      function setHint(text) {
+        document.getElementById('hint').textContent = text || '';
+      }
+
+      async function jsonFetch(url, options) {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        let body;
+        try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${JSON.stringify(body)}`);
+        }
+        return body;
+      }
+
+      async function checkHealth() {
+        setHint('Checking...');
+        const data = await jsonFetch('/v1/health', { method: 'GET' });
+        document.getElementById('statusText').textContent = 'health: ok';
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        setHint('');
+      }
+
+      async function sendChat() {
+        const message = document.getElementById('message').value.trim();
+        const sessionId = document.getElementById('sessionId').value.trim();
+        const preset = document.getElementById('preset').value.trim();
+        const finalMessage = message || preset;
+
+        if (!finalMessage) {
+          setHint('Please enter a message.');
+          return;
+        }
+
+        setHint('Sending...');
+        document.getElementById('statusText').textContent = 'running...';
+
+        const csvInput = document.getElementById('csvFile');
+        const csvFile = csvInput.files && csvInput.files.length ? csvInput.files[0] : null;
+
+        // If a CSV is attached, upload it first and then satisfy the agent's `csv_path`
+        // multi-turn parameter collection automatically.
+        if (csvFile) {
+          const fd = new FormData();
+          fd.append('file', csvFile);
+          setHint('Uploading CSV...');
+
+          const upload = await jsonFetch('/v1/upload_csv', {
+            method: 'POST',
+            body: fd,
+          });
+
+          const serverCsvPath = upload.server_csv_path;
+          document.getElementById('csvPathPreview').textContent = `Uploaded to: ${serverCsvPath}`;
+
+          // Scrape-only: no LLM. Server will run yt-dlp extraction for each post URL.
+          setHint('Scraping CSV (yt-dlp only)...');
+          const scraped = await jsonFetch('/v1/scrape_csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv_path: serverCsvPath }),
+          });
+
+          document.getElementById('statusText').textContent = `completed (scrape-only)`;
+          document.getElementById('output').textContent = JSON.stringify(scraped, null, 2);
+          setHint('');
+          return;
+        }
+
+        // No CSV attached: just send message directly.
+        const payload = { message: finalMessage };
+        if (sessionId) payload.session_id = sessionId;
+
+        const data = await jsonFetch('/v1/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        document.getElementById('statusText').textContent = `${data.status} (${data.agent_name})`;
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        setHint('');
+
+        if (data.session_id && !sessionId) {
+          document.getElementById('sessionId').value = data.session_id;
+        }
+      }
+
+      document.getElementById('healthBtn').addEventListener('click', checkHealth);
+      document.getElementById('sendBtn').addEventListener('click', sendChat);
+    </script>
+  </body>
+</html>
+
