@@ -46,8 +46,6 @@ import {
   getDefaultChartPlacementForSlide,
   normalizeChartPlacement,
 } from "@/lib/chartPlacement";
-import { speak, useVoiceAssistant } from "@/hooks/useVoiceAssistant";
-import { VoiceAssistantMic } from "@/components/voice/VoiceAssistantMic";
 
 type View = "home" | "generating" | "editor";
 
@@ -218,7 +216,6 @@ export function LfAiApp({
   const [uploadDragActive, setUploadDragActive] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<any>(null);
-  const stopAssistantRef = useRef<() => void>(() => {});
   const [speechSupported, setSpeechSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [chartPrompt, setChartPrompt] = useState("");
@@ -557,7 +554,6 @@ export function LfAiApp({
   }
 
   function toggleVoiceInput() {
-    stopAssistantRef.current();
     if (!speechSupported) {
       pushToast({ variant: "error", title: "Voice not supported", message: "This browser doesn’t support speech input." });
       return;
@@ -986,73 +982,6 @@ export function LfAiApp({
   async function handleGenerate() {
     return handleGenerateWithPrompt(prompt);
   }
-
-  const handleGenerateWithPromptRef = useRef(handleGenerateWithPrompt);
-  handleGenerateWithPromptRef.current = handleGenerateWithPrompt;
-
-  const voiceAssistant = useVoiceAssistant({
-    languageLabel: language,
-    promptTimeoutMs: 12000,
-    onPromptReady: (t) => void handleGenerateWithPromptRef.current(t),
-    onVoiceQa: async (q) => {
-      const res = await fetch("/api/ai/voice-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q }),
-      });
-      const rawText = await res.text();
-      let answer = "I couldn’t load an answer. Check your connection and try again.";
-      let speakLang: "en" | "hi" = "en";
-      try {
-        const j = JSON.parse(rawText) as { answer?: string; speakLang?: string; warning?: string };
-        if (typeof j.answer === "string" && j.answer.trim()) {
-          answer = j.answer.trim();
-          if (j.speakLang === "hi") speakLang = "hi";
-        } else if (!res.ok) {
-          answer = rawText.slice(0, 200) || answer;
-        }
-      } catch {
-        if (!res.ok) answer = rawText.slice(0, 200) || answer;
-      }
-      await speak(answer, {
-        lang: speakLang === "hi" ? "hi-IN" : "en-US",
-      });
-      pushToast({
-        variant: "success",
-        title: "LF AI assistant",
-        message: answer.length > 280 ? `${answer.slice(0, 280)}…` : answer,
-      });
-    },
-    onLiveTranscript: (t) => setPrompt(t),
-    onRequestStopOtherVoice: () => {
-      stopVoiceInput();
-      setListening(false);
-    },
-    onToast: pushToast,
-  });
-
-  useEffect(() => {
-    stopAssistantRef.current = voiceAssistant.stopListening;
-  }, [voiceAssistant.stopListening]);
-
-  useEffect(() => {
-    if (view !== "home") voiceAssistant.stopListening();
-  }, [view, voiceAssistant.stopListening]);
-
-  const voiceAssistantStartRef = useRef(voiceAssistant.startListening);
-  voiceAssistantStartRef.current = voiceAssistant.startListening;
-
-  /** Auto-listen for wake phrases (Hey AI, Hello AI, Wake up AI) on home. First tap also starts recognition (helps browsers that need a user gesture for the mic). */
-  useEffect(() => {
-    if (view !== "home" || !appReady || !user || !speechSupported || pptStarting) return;
-    const start = () => voiceAssistantStartRef.current();
-    const id = window.setTimeout(start, 450);
-    document.addEventListener("pointerdown", start, { once: true, capture: true });
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener("pointerdown", start, { capture: true });
-    };
-  }, [view, appReady, user, speechSupported, pptStarting]);
 
   function shuffleSamplePrompts() {
     const shuffled = [...SAMPLE_PROMPT_POOL]
@@ -3302,20 +3231,6 @@ export function LfAiApp({
             void handleExportGoogleSlides();
           }}
           userLabel={user.username}
-        />
-      ) : null}
-
-      {view === "home" && appReady && user ? (
-        <VoiceAssistantMic
-          micState={voiceAssistant.micState}
-          liveTranscript={voiceAssistant.liveTranscript}
-          isSupported={voiceAssistant.isSupported}
-          active={voiceAssistant.phase !== "off"}
-          disabled={pptStarting}
-          onToggle={() => {
-            if (voiceAssistant.phase === "off") voiceAssistant.startListening();
-            else voiceAssistant.stopListening();
-          }}
         />
       ) : null}
     </div>
